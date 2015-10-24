@@ -1,0 +1,150 @@
+---
+title: "Classification of Qualitative Analysis of Human Activity Recognition of Exercise Routines"
+author: "John Lovrinic"
+date: "Thursday, October 15, 2015"
+output: html_document
+---
+```{r environment, echo=FALSE,warnings=FALSE, include=FALSE}
+```
+## Summary
+This paper presents an analysis of data from the Human Activity Recognition Project WLE dataset:
+  
+  
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. [Qualitative Activity Recognition of Weight Lifting Exercises](http://groupware.les.inf.puc-rio.br/work.jsf?p1=11201). Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. 
+
+Read more about this project at [Groupware->Projects->HAR](http://groupware.les.inf.puc-rio.br/har#sbia_paper_section).
+
+Our objective is to attempt to classify the the manner of the exercises performed (correctly or which manner of incorrectness), based on the qualitative information provided by the data set. 
+The test data consists of the 6 participants performing Unilateral Dumbbell Biceps Curl in five different fashions:
+
+- Class A - exactly according to the specification (correct)
+- Class B - throwing the elbows to the front (incorrect)
+- Class C - lifting the dumbbell only halfway (incorrect)
+- Class D - lowering the dumbbell only halfway (incorrect)
+- Class E - throwing the hips to the front (incorrect)
+
+
+
+## Analysis
+### Preprocessing
+We began by paring down the dataset to useful information.  This entailed removing every column related to stddev, avg, var, max, min, amplitude, kurtosis, skewness, timestamp, row identifier (X), window information and subject name.  Most were null, or NA, and names, which identify the subject, while a factor, would affect the general applicability of our solution.  A further reducion of features was contemplated, but doing all 2x combinations to look for highly correlated pairs was impractical given our limit of 5 plots for this paper.  This left us with 54 features:
+
+``` {r }
+names(training)
+```
+
+### Model Fitting
+#### Initial Efforts
+Given this was a classification problem with more than 2 resultant classes, it was decided to explore an rpart and a random forest solution.  Prior to breaking down the data into training and test sets and for each training run, we set the seed to 12432.  We started with a 60/40 training/test split and employing the rpart method.  While quick, accuracy was less than 50% and so not acceptable. Switching to the random forest method, accuracy jumped to 95%, but execution time also climbed to over an hour.  At this time a 70/30 training/test split was attempted and this gave satisfactory results with accuracy of over 99% and execution time climbing no higher.
+
+A breakdown of the findings follows.
+```{r model1, echo=FALSE,warnings=FALSE, include=FALSE}
+```
+Confusion Matrix
+```{r }
+confusionMatrix(pred,reference=testing$classe)
+result
+```
+#### Determining Final Model
+Now that we have a working model, it was decided to try and improve operational efficiency while not losing too much accuracy.  To achieve that we did some analysis on the model.
+
+```{r }
+imp<-varImp(modfit,scale=FALSE)
+plot(imp)
+```
+
+This show us that between 20 and thirty of the properties should be sufficient to achieve acceptable results.  Retraining for the top 20 we achieve the following results for the reduced model.
+
+```{r model2, include=FALSE,echo=FALSE}
+```
+
+```{r }
+result2
+confusionMatrix(pred2,reference=testing2$classe)
+varImp(modfit2)
+```
+
+One more attempt was done, this time with only 7 properties, and that also gave very good results.
+
+```{r model3, include=FALSE,echo=FALSE}
+```
+
+```{r }
+result3
+confusionMatrix(pred3,reference=testing3$classe)
+varImp(modfit3)
+```
+## Conclusion
+We see that the accuracy and kappa values are still well above 95%, and that our p value is almost non-existant.  This would lead us to expect that we have found a good but not too expensive to obtain model.
+
+
+```{r environment, echo=FALSE,include=FALSE}
+library(AppliedPredictiveModeling)
+library(caret)
+library(ElemStatLearn)
+library(pgmm)
+library(knitr)
+library(randomForest)
+setwd("F:/Coursera/Practical Machine Learning/CourseProject")
+dat<-read.csv("pml-training.csv")
+test<-read.csv("pml-testing.csv")
+l1<-grepl("stddev|avg|var|max|min|amplitude|kurtosis|skewness|name|timestamp|window",names(dat),perl=TRUE,ignore.case=TRUE)
+l1[1]<-TRUE
+d1<-dat[,!l1]
+set.seed(12432)
+intrain<-createDataPartition(y=d1$classe,p=.7,list=FALSE)
+training<-d1[intrain,]
+testing<-d1[-intrain,]
+```
+
+
+``` {r model1, echo=FALSE, include=FALSE }
+set.seed(12432)
+modfit<-train(classe~.,method="rf",data=training)
+result<-modfit$finalModel
+pred<-predict(modfit,newdata=testing)
+ans<-predict(modfit,newdata=test)
+```
+
+``` {r model2, echo=FALSE,include=FALSE }
+l2<-c("roll_belt",
+"pitch_forearm",
+"yaw_belt",
+"magnet_dumbbell_y",
+"magnet_dumbbell_z",
+"pitch_belt",
+"roll_forearm",
+"accel_dumbbell_y",
+"accel_forearm_x",
+"roll_dumbbell",
+"magnet_dumbbell_x",  
+"accel_belt_z" ,        "accel_dumbbell_z" ,   
+"total_accel_dumbbell", "magnet_belt_y",       
+"magnet_belt_z" ,       "magnet_forearm_z",    
+"magnet_belt_x",        "roll_arm",            
+"classe")
+training2<-training[,l2]
+testing2<-testing[,l2]
+modfit2<-train(classe~.,method="rf",data=training2)
+result2<-modfit2$finalModel
+pred2<-predict(modfit2,newdata=testing2)
+ans2<-predict(modfit2,newdata=test)
+```
+
+
+``` {r model3, echo=FALSE,include=FALSE }
+l3<-c("roll_belt",
+"pitch_forearm",
+"yaw_belt",
+"magnet_dumbbell_y",
+"magnet_dumbbell_z",
+"pitch_belt",
+"roll_forearm",           
+"classe")
+training3<-training[,l3]
+testing3<-testing[,l3]
+modfit3<-train(classe~.,method="rf",data=training3)
+result3<-modfit3$finalModel
+pred3<-predict(modfit3,newdata=testing3)
+ans3<-predict(modfit3,newdata=test)
+```
